@@ -66,7 +66,15 @@ export const CreateEventDialog = ({ open, onOpenChange }: CreateEventDialogProps
 
       if (error) throw error;
 
-      toast.success("Event created successfully!");
+      // Auto-generate 10 voter codes
+      const voterCodes = Array.from({ length: 10 }, (_, i) => ({
+        event_id: data.id,
+        voter_code: `VOTE-${data.id.slice(0, 8).toUpperCase()}-${String(i + 1).padStart(3, '0')}`,
+      }));
+
+      await supabase.from("voters").insert(voterCodes);
+
+      toast.success("Event created successfully with voter codes!");
       onOpenChange(false);
       navigate(`/admin/event/${data.id}`);
     } catch (error: any) {
