@@ -3,7 +3,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Vote as VoteIcon } from "lucide-react";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
@@ -19,6 +18,10 @@ const Vote = () => {
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [voterCode, setVoterCode] = useState("");
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [voterCodeInput, setVoterCodeInput] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
 
   useEffect(() => {
     if (!eventId) return;
@@ -64,6 +67,39 @@ const Vote = () => {
     }
   };
 
+  const handleVerifyCode = async () => {
+    if (!voterCodeInput.trim() || !eventId) return;
+
+    setIsVerifying(true);
+
+    try {
+      const { data: voter, error } = await supabase
+        .from("voters")
+        .select("*")
+        .eq("event_id", eventId)
+        .eq("voter_code", voterCodeInput.trim().toUpperCase())
+        .single();
+
+      if (error || !voter) {
+        toast.error("Invalid voter code");
+        return;
+      }
+
+      if (voter.used) {
+        toast.error("This voter code has already been used");
+        return;
+      }
+
+      setVoterCode(voter.voter_code);
+      setIsAuthenticated(true);
+      toast.success("Voter code verified!");
+    } catch (error: any) {
+      toast.error("Failed to verify voter code");
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!event || selectedItems.length === 0) return;
 
@@ -81,10 +117,17 @@ const Vote = () => {
         .insert({
           event_id: event.id,
           item_ids: selectedItems,
-          voter_code: "public",
+          voter_code: voterCode,
         });
 
       if (voteError) throw voteError;
+
+      // Mark voter as used
+      await supabase
+        .from("voters")
+        .update({ used: true, voted_at: new Date().toISOString() })
+        .eq("voter_code", voterCode)
+        .eq("event_id", event.id);
 
       // Update vote counts
       for (const itemId of selectedItems) {
@@ -129,6 +172,54 @@ const Vote = () => {
             <p className="text-muted-foreground">
               This voting event is currently {event.status}. Please check back later.
             </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+        <Card className="max-w-md w-full">
+          <CardHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
+                <VoteIcon className="w-6 h-6 text-primary-foreground" />
+              </div>
+              <div>
+                <CardTitle className="text-2xl">{event.event_name}</CardTitle>
+                <p className="text-sm text-muted-foreground">{event.category}</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Enter Your Voter ID</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Please enter the voter ID provided to you by the event administrator.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={voterCodeInput}
+                  onChange={(e) => setVoterCodeInput(e.target.value.toUpperCase())}
+                  placeholder="Enter voter code"
+                  className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleVerifyCode();
+                    }
+                  }}
+                />
+                <Button
+                  onClick={handleVerifyCode}
+                  disabled={isVerifying || !voterCodeInput.trim()}
+                >
+                  {isVerifying ? "Verifying..." : "Verify"}
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
