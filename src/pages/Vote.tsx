@@ -88,10 +88,16 @@ const Vote = () => {
 
       // Update vote counts
       for (const itemId of selectedItems) {
-        const { error: updateError } = await supabase.rpc("increment_votes", {
-          item_id: itemId,
-        });
-        if (updateError) console.error(updateError);
+        const { data: item } = await supabase
+          .from("items")
+          .select("votes")
+          .eq("id", itemId)
+          .single();
+        
+        await supabase
+          .from("items")
+          .update({ votes: (item?.votes || 0) + 1 })
+          .eq("id", itemId);
       }
 
       toast.success("Vote submitted successfully!");
