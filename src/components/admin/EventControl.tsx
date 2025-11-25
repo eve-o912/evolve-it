@@ -22,10 +22,8 @@ export const EventControl = ({ event }: EventControlProps) => {
   const voteUrl = `${window.location.origin}/vote/${event.id}`;
 
   useEffect(() => {
-    if (event.status === "active") {
-      QRCode.toDataURL(voteUrl, { width: 300 }).then(setQrCodeUrl);
-    }
-  }, [event.status, voteUrl]);
+    QRCode.toDataURL(voteUrl, { width: 300 }).then(setQrCodeUrl);
+  }, [voteUrl]);
 
   useEffect(() => {
     const checkEventTime = () => {
@@ -104,7 +102,7 @@ export const EventControl = ({ event }: EventControlProps) => {
 
   return (
     <div className="space-y-6">
-      {event.status === "active" && qrCodeUrl && (
+      {qrCodeUrl && (
         <Card className="border-primary">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
