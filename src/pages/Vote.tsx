@@ -109,15 +109,33 @@ const Vote = () => {
     }
 
     setIsSubmitting(true);
+    let blockchainHash = null;
 
     try {
-      // Insert vote
+      // Record vote on blockchain first
+      try {
+        const { recordBlockchainVote } = await import("@/lib/blockchain/voting");
+        
+        // Record vote for each selected item on blockchain
+        for (const itemId of selectedItems) {
+          blockchainHash = await recordBlockchainVote(event.id, itemId, voterCode);
+          console.log('Blockchain vote recorded:', blockchainHash);
+        }
+        
+        toast.success("Vote recorded on blockchain!");
+      } catch (blockchainError: any) {
+        console.error("Blockchain error:", blockchainError);
+        toast.error("Blockchain recording failed, but proceeding with database vote");
+      }
+
+      // Insert vote in database
       const { error: voteError } = await supabase
         .from("votes")
         .insert({
           event_id: event.id,
           item_ids: selectedItems,
           voter_code: voterCode,
+          blockchain_hash: blockchainHash,
         });
 
       if (voteError) throw voteError;
